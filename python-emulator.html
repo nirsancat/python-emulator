@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Emulator</title>
+
+<!-- Pyodide -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #171923;
+        color: white;
+    }
+
+    header {
+        background: #202435;
+        padding: 18px 25px;
+        border-bottom: 1px solid #383e50;
+    }
+
+    header h2 {
+        margin: 0;
+        color: #61dafb;
+    }
+
+    .container {
+        padding: 20px;
+        max-width: 1100px;
+        margin: auto;
+    }
+
+    textarea {
+        width: 100%;
+        height: 350px;
+        resize: vertical;
+        background: #10131d;
+        color: #e6edf3;
+        border: 1px solid #444b60;
+        border-radius: 8px;
+        padding: 18px;
+        font-family: Consolas, monospace;
+        font-size: 15px;
+        line-height: 1.6;
+        outline: none;
+        tab-size: 4;
+    }
+
+    textarea:focus {
+        border-color: #61dafb;
+    }
+
+    button {
+        padding: 11px 22px;
+        margin-top: 12px;
+        margin-right: 8px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    #run {
+        background: #238636;
+        color: white;
+    }
+
+    #clear {
+        background: #343b4d;
+        color: white;
+    }
+
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .output-title {
+        margin-top: 25px;
+        margin-bottom: 10px;
+        color: #61dafb;
+    }
+
+    #output {
+        min-height: 150px;
+        background: #10131d;
+        border: 1px solid #444b60;
+        border-radius: 8px;
+        padding: 15px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: Consolas, monospace;
+        font-size: 14px;
+        color: #b9f6ca;
+    }
+
+    #status {
+        color: #aab2c5;
+        font-size: 13px;
+        margin-top: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h2>Python Emulator</h2>
+</header>
+
+<div class="container">
+
+    <h3>Python Code Editor</h3>
+
+    <textarea id="code" spellcheck="false">print("Hello, World!")
+
+name = "Python"
+print("Welcome to", name)
+
+for i in range(5):
+    print("Number:", i)</textarea>
+
+    <br>
+
+    <button id="run" onclick="runCode()">▶ Run Code</button>
+    <button id="clear" onclick="clearOutput()">Clear Output</button>
+
+    <p id="status">Loading Python...</p>
+
+    <h3 class="output-title">Output</h3>
+
+    <div id="output">Your output will appear here...</div>
+
+</div>
+
+<script>
+let pyodide;
+
+async function initializePython() {
+    const status = document.getElementById("status");
+    const runButton = document.getElementById("run");
+
+    runButton.disabled = true;
+
+    try {
+        pyodide = await loadPyodide();
+
+        status.textContent = "Python is ready!";
+        runButton.disabled = false;
+
+    } catch (error) {
+        status.textContent = "Failed to load Python.";
+        document.getElementById("output").textContent =
+            error.toString();
+    }
+}
+
+async function runCode() {
+    const code = document.getElementById("code").value;
+    const output = document.getElementById("output");
+    const status = document.getElementById("status");
+    const runButton = document.getElementById("run");
+
+    if (!pyodide) return;
+
+    runButton.disabled = true;
+    status.textContent = "Running Python code...";
+    output.textContent = "";
+
+    try {
+        pyodide.setStdout({
+            batched: (text) => {
+                output.textContent += text + "\n";
+            }
+        });
+
+        pyodide.setStderr({
+            batched: (text) => {
+                output.textContent += text + "\n";
+            }
+        });
+
+        // Support Python input() through browser prompts.
+        pyodide.globals.set(
+            "browser_input",
+            (promptText) => {
+                return window.prompt(promptText || "");
+            }
+        );
+
+        await pyodide.runPythonAsync(`
+import builtins
+builtins.input = browser_input
+`);
+
+        await pyodide.runPythonAsync(code);
+
+        status.textContent = "Execution completed.";
+
+    } catch (error) {
+        output.textContent += "\n" + error.toString();
+        status.textContent = "Execution failed.";
+    } finally {
+        runButton.disabled = false;
+    }
+}
+
+function clearOutput() {
+    document.getElementById("output").textContent = "";
+    document.getElementById("status").textContent =
+        "Output cleared.";
+}
+
+initializePython();
+</script>
+
+</body>
+</html>
